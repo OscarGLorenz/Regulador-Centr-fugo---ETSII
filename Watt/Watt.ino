@@ -6,23 +6,19 @@
 #define MOTOR_1_PWM   5
 #define MOTOR_2_PWM   6
 
-//Motor configuration
+//Interrupt Configuration
+#define MOTOR_1_PIN         PINB
+#define MOTOR_1_DIR         PINB2 
+
 #define REDUCT 46.67
 #define PULSES  32.0
-
-template <typename T>
-union Data {
-  T value;
-  byte buffer[sizeof(T)];
-};
-
-//Control motores
-void setMotor(int16_t pwm) {
-  pwm = constrain(pwm, -250, 250);
-  if (pwm < 0)
+  
+void setMotor1Pwm(int16_t pwm) { 
+  pwm = constrain(pwm,-250,250);
+  if(pwm < 0)
   {
     digitalWrite(5, LOW);
-    analogWrite(6, abs(pwm));
+    analogWrite(6, abs(pwm));  
   }
   else
   {
@@ -31,62 +27,59 @@ void setMotor(int16_t pwm) {
   }
 }
 
-volatile uint16_t encoder = 0;
-volatile double speed = 0;
+volatile uint16_t count1 = 0;
 
+void motor1() {
+   count1++;
+}
+
+volatile double speed = 0;
 void speedRPM() {
-  static unsigned long lastEncoder = encoder;
+  static unsigned long lastCount = count1;
   static unsigned long lastTime = millis();
 
 
-  double incrAngulo = (double) ((long) lastEncoder - (long) encoder ) / 360.0 * PULSES / REDUCT ;
+  double incrAngulo = (double) ((long) lastCount - (long) count1 )/ 360.0 * PULSES / REDUCT ;
   speed = 1000.0 * incrAngulo / (double) ((millis() - lastTime)) * 60;
 
 
   lastTime = millis();
-  lastEncoder = encoder;
-}
-
-ISR(TIMER0_COMPA_vect) {
-  if (!(millis() % 100)) speedRPM();
+  lastCount = count1;
 }
 
 void setup() {
 
   Serial.begin(115200);
-  Serial.setTimeout(10);
-
+  
   pinMode(INT_1_PIN, INPUT_PULLUP);
 
-  attachInterrupt(digitalPinToInterrupt(INT_1_PIN), [&encoder]() {
-    encoder++;
-  }, RISING);
-  /*
-    Cuando el TIMER0 del ATMEGA328, pase por 0F se ejecutará
-    nuestra interrupción (cada ms).
-    Este TIMER es el que usa la función millis().
-    Referencia: https://learn.adafruit.com/
+  attachInterrupt(digitalPinToInterrupt(INT_1_PIN),motor1,RISING);
+    /*
+     Cuando el TIMER0 del ATMEGA328, pase por 0F se ejecutará
+     nuestra interrupción (cada ms).
+     Este TIMER es el que usa la función millis().
+     Referencia: https://learn.adafruit.com/
   */
   OCR0A = 0x0F;
   TIMSK0 |= _BV(OCIE0A);
 }
 
-void loop() {
-  union Data<double> data; 
-  static unsigned long sum = 0;
-  static double ref = 0.0;
+ISR(TIMER0_COMPA_vect) {
+  if (!(millis()%100)) speedRPM();
+}
+unsigned long sum = 0;
 
-  if (Serial.available() > 0) {
-    Serial.readBytes(data.buffer, sizeof(data));
-    ref = data.value;
-  }
-  
-  double err = ref + speed;
+void loop() {  
+    double err = 120.0+speed;
+
+
+
+
   sum += err;
+
+  setMotor1Pwm(constrain(abs(sum * 0.8), 0, 255));
+  Serial.println(String(-speed) + " 120"); delay(100);
+
   
-  setMotor(constrain(abs(sum * 0.8), 0, 250));
-  
-  data.value = speed;
-  Serial.write(data.buffer, sizeof(data)); Serial.println();
   
 }
