@@ -15,6 +15,7 @@ union Data {
   T value;
   byte buffer[sizeof(T)];
 };
+template <typename T> using Union = Data<T>;
 
 //Control motores
 void setMotor(int16_t pwm) {
@@ -31,12 +32,12 @@ void setMotor(int16_t pwm) {
   }
 }
 
-volatile unsigned long encoder = 0;
+volatile long encoder = 0;
 volatile double speed = 0;
 
 void speedRPM() {
-  static unsigned long lastEncoder = encoder;
-  static unsigned long lastTime = millis();
+  static long lastEncoder = encoder;
+  static long lastTime = millis();
 
 
   double incrAngulo = (double) ((long) lastEncoder - (long) encoder ) / 360.0 * PULSES / REDUCT ;
@@ -52,17 +53,16 @@ ISR(TIMER0_COMPA_vect) {
 
 void setup() {
 
-  Serial.begin(115200);
-  Serial.setTimeout(10);
+  Serial.begin(9600);
+  Serial.setTimeout(100);
 
   pinMode(INT_1_PIN, INPUT_PULLUP);
 
   attachInterrupt(digitalPinToInterrupt(INT_1_PIN), 
-    [&encoder]() {
-      encoder++;
-    }
+  [&encoder]() {
+    encoder++;
+  } 
   ,RISING);
-
   
   /*
     Cuando el TIMER0 del ATMEGA328, pase por 0F se ejecutará
@@ -75,21 +75,21 @@ void setup() {
 }
 
 void loop() {
-  union Data<double> data;
-  static unsigned long sum = 0;
-  static double ref = 120.0;
+  Union<double> data;
+  static long sum = 0;
+  static double ref = -30.0;
 
   if (Serial.available() > 0) {
-    Serial.readBytesUntil('\n',data.buffer, sizeof(data));
-    ref = data.value;
-  }
+    Serial.readBytes(data.buffer, sizeof(data));
+    ref = -data.value;
+  } 
 
-  double err = ref + speed;
-  sum += err;
+  double err = ref - speed;
+  sum = constrain(err+sum,-400,400);
 
-  setMotor(constrain(abs(sum * 0.8), 0, 250));
+  setMotor(sum * 0.8);
 
-  data.value = speed;
-  //Serial.write(data.buffer, sizeof(data)); Serial.println();
+  data.value = -speed;
+  Serial.write(data.buffer, sizeof(data));
   delay(100);
 }
