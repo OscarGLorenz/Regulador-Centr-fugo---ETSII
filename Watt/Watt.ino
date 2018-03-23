@@ -94,8 +94,7 @@ void loop() {
   // Regulador PI
   setMotor(abs(KP * err + KI * sum));
 
-  Serial.print(ref + String(" ")); Serial.println(-speed);
-  delay(100);
+  Serial.println(-speed);
 
   if (Serial.available() > 0) {
     ref = Serial.parseFloat(); 
