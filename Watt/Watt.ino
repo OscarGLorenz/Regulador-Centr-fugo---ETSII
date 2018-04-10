@@ -10,7 +10,7 @@
 //Motor configuration
 #define REDUCT 46.67
 #define PULSES  32.0
-
+#define GEAR_RELATION 90.0/62.0
 // Regulador PI
 #define KP 0.0
 #define KI 0.8
@@ -44,7 +44,7 @@ void speedRPM() {
   double incrAngulo = (double) ((long) lastEncoder - (long) encoder ) / 360.0 * PULSES / REDUCT ;
 
   // Velocidad en RPM
-  speed = 1000.0 * incrAngulo / (double) ((millis() - lastTime)) * 60;
+  speed = 1000.0 * incrAngulo / (double) ((millis() - lastTime)) * 60 * GEAR_RELATION;
 
   // Guardar variables para el siguiente ciclo
   lastTime = millis();
@@ -81,7 +81,7 @@ void setup() {
   OCR0A = 0x0F;
   TIMSK0 |= _BV(OCIE0A);
 }
-double ref = 80.0;
+double ref = 0.0;
 double sum = 0.0;
 
 void loop() {
@@ -92,7 +92,12 @@ void loop() {
   sum  = constrain(err + sum, -WIND_UP, WIND_UP);
 
   // Regulador PI
-  setMotor(abs(KP * err + KI * sum));
+  if (abs(ref) > 0.1) {
+    setMotor(abs(KP * err + KI * sum));
+  } else {
+    setMotor(0);
+    sum = 0;
+  }
 
   Serial.println(-speed);
 
